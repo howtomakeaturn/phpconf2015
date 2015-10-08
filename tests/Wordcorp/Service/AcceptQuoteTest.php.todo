@@ -1,0 +1,84 @@
+<?php
+
+use Wordcorp\Quotes\QuoteFactory;
+use Wordcorp\Quotes\QuoteRepository;
+use Wordcorp\Quotes\AcceptService;
+use Wordcorp\Quotes\Quote;
+
+class AcceptQuoteTest extends TestCase {
+
+    protected $faker;
+    
+    public function setUp()
+    {
+        parent::setUp();
+        \League\FactoryMuffin\Facade::loadFactories(dirname(dirname(__DIR__)) . '/factories');
+        $this->faker = Faker\Factory::create('en_US');
+    }
+
+    public function tearDown()
+    {
+        \League\FactoryMuffin\Facade::deleteSaved();
+    }    
+    
+    public function testAcceptWithoutCoupon()
+    {
+        $quote = \League\FactoryMuffin\Facade::create('Wordcorp\Quotes\Quote');
+        
+        $document = \League\FactoryMuffin\Facade::create('Document', ['project_id' => $quote->project->id]);
+        
+        $service = new AcceptService();
+        
+        $service->accept($quote);
+        
+        $quote = Wordcorp\Quotes\Quote::find($quote->id);
+        
+        $this->assertEquals($quote->project->due_datetime, $quote->due_datetime);
+        
+        $this->assertEquals($quote->project->rate, $quote->rate);
+        
+        $this->assertEquals($quote->project->status, Project::CONFIRM_STATUS);
+        
+        $this->assertEquals($quote->status, Quote::ACCEPTED);
+        
+        $this->assertEquals($quote->project->price, round($quote->rate * $quote->project->wordcount_total));
+
+        $this->assertEquals($quote->project->discount, 0);
+
+        $this->assertEquals($quote->project->final_price, round($quote->rate * $quote->project->wordcount_total));        
+    }
+
+    public function testAcceptWithCoupon()
+    {
+        $coupon = \League\FactoryMuffin\Facade::create('Coupon', ['percent' => 0, 'fixed' => 25]);
+
+        $quote = \League\FactoryMuffin\Facade::create('Wordcorp\Quotes\Quote');
+        
+        $document = \League\FactoryMuffin\Facade::create('Document', ['project_id' => $quote->project->id]);
+
+        $quote->project->coupon_id = $coupon->id;
+        
+        $quote->project->setWordCountTotal();
+        
+        $service = new AcceptService();
+        
+        $service->accept($quote);
+        
+        $quote = Wordcorp\Quotes\Quote::find($quote->id);
+        
+        $this->assertEquals($quote->project->due_datetime, $quote->due_datetime);
+        
+        $this->assertEquals($quote->project->rate, $quote->rate);
+        
+        $this->assertEquals($quote->project->status, Project::CONFIRM_STATUS);
+        
+        $this->assertEquals($quote->status, Quote::ACCEPTED);
+        
+        $this->assertEquals($quote->project->price, round($quote->rate * $quote->project->wordcount_total));
+
+        $this->assertEquals($quote->project->discount, 25);
+
+        $this->assertEquals($quote->project->final_price, round($quote->rate * $quote->project->wordcount_total) - 25);        
+    }
+    
+}

@@ -1,0 +1,46 @@
+<?php
+use \Wordcorp\Quotes\QuoteFactory;
+
+class QuoteFactoryTest extends TestCase {
+
+    public function testCreate()
+    {
+        $factory = new QuoteFactory();
+        
+        $project = new Project();
+        
+        $due = new Datetime('2015-12-12 12:12');
+        
+        $rate = 5.5;
+        
+        $quote = $factory->create($due, $rate, $project);
+        
+        $this->assertEquals(get_class($quote), 'Wordcorp\Quotes\Quote');
+    }
+    
+    public function testCreateOptimizedQuote()
+    {
+        $factory = new QuoteFactory();
+        
+        $project = new Project();
+        
+        $document = new Document();
+        
+        $document->cn_char_count = rand(1, 2000);
+
+        $project->documents = [$document];
+        
+        $project->lang_combo = '2';
+        
+        $project->wordcount_total = $document->cn_char_count;
+
+        Quotation::offer($project);
+
+        $quote = $factory->createOptimizedQuote($project);
+        
+        $this->assertEquals($project->rate, $quote->rate);
+
+        $this->assertEquals($project->due_datetime, $quote->due_datetime);        
+    }
+    
+}

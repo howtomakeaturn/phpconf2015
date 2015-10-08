@@ -1,0 +1,163 @@
+<?php
+
+class AcceptOptimalQuoteServiceTest extends TestCase 
+{
+    
+    protected $service;
+    
+    protected $faker;
+
+    public function setUp()
+    {
+        parent::setUp();
+
+        \League\FactoryMuffin\Facade::loadFactories(dirname(dirname(__DIR__)) . '/factories');
+
+        $this->faker = Faker\Factory::create('en_US');
+
+        $this->service = new AcceptOptimalQuoteService(
+            new PremiumCouponRepository()
+        );
+        
+        Coupon::truncate();
+        Project::truncate();
+        Document::truncate();
+    }
+    
+    public function tearDown()
+    {
+        \League\FactoryMuffin\Facade::deleteSaved();
+    }
+
+    // No code coupon. No codeless coupon. 
+    public function testProcessWithScenarioA()
+    {
+        $project = \League\FactoryMuffin\Facade::create('Project', 
+            [ 'status' => Project::CREATED_STATUS, 
+              'lang_combo' => Quotation::rate('cn_to_en'), 
+              'b2b' => true ]
+        );
+
+        $document = \League\FactoryMuffin\Facade::create('Document', ['project_id' => $project->id]);
+        
+        $project = Project::find($project->id);
+        
+        $project->setOptimalQuote();
+        
+        $this->service->process($project, '');
+        
+        $this->assertEquals($project->status, Project::WIP_STATUS);
+
+        $this->assertEquals($project->price, round($project->wordcount_total * Quotation::rate('cn_to_en')));
+
+        $this->assertEquals($project->discount, 0);
+
+        $this->assertEquals($project->final_price, round($project->wordcount_total * Quotation::rate('cn_to_en')));
+    }
+
+    // Has code coupon. No codeless coupon. 
+    public function testProcessWithScenarioB()
+    {
+        $project = \League\FactoryMuffin\Facade::create('Project', 
+            [ 'status' => Project::CREATED_STATUS, 
+              'lang_combo' => Quotation::rate('cn_to_en'), 
+              'b2b' => true ]
+        );
+
+        $document = \League\FactoryMuffin\Facade::create('Document', ['project_id' => $project->id]);
+
+        $project = Project::find($project->id);
+        
+        $project->setWordCountTotal();
+        
+        $project->setOptimalQuote();
+
+        $coupon = \League\FactoryMuffin\Facade::create('Coupon', 
+            [ 'promotion_code' => 'www', 
+              'percent' => 0, 
+              'fixed' => 25] );
+        
+        $this->service->process($project, 'www');
+        
+        $this->assertEquals($project->status, Project::WIP_STATUS);
+
+        $this->assertEquals($project->price, round($project->wordcount_total * Quotation::rate('cn_to_en')));
+
+        $this->assertEquals($project->discount, 25);
+
+        $this->assertEquals($project->final_price, round($project->wordcount_total * Quotation::rate('cn_to_en')) -25);        
+    }
+
+    // No code coupon. Has codeless coupon. 
+    public function testProcessWithScenarioC()
+    {
+        $project = \League\FactoryMuffin\Facade::create('Project', 
+            [ 'status' => Project::CREATED_STATUS, 
+              'lang_combo' => Quotation::rate('cn_to_en'), 
+              'b2b' => true ]
+        );
+
+        $document = \League\FactoryMuffin\Facade::create('Document', ['project_id' => $project->id]);
+
+        $project = Project::find($project->id);
+        
+        $project->setWordCountTotal();
+        
+        $project->setOptimalQuote();
+
+        $coupon = \League\FactoryMuffin\Facade::create('Coupon', 
+            [ 'promotion_code' => '', 
+              'percent' => 0, 
+              'fixed' => 35] );
+        
+        $this->service->process($project, '');
+        
+        $this->assertEquals($project->status, Project::WIP_STATUS);
+
+        $this->assertEquals($project->price, round($project->wordcount_total * Quotation::rate('cn_to_en')));
+
+        $this->assertEquals($project->discount, 35);
+
+        $this->assertEquals($project->final_price, round($project->wordcount_total * Quotation::rate('cn_to_en')) -35);                
+    }
+
+    // Has code coupon. Has codeless coupon. 
+    public function testProcessWithScenarioD()
+    {
+        $project = \League\FactoryMuffin\Facade::create('Project', 
+            [ 'status' => Project::CREATED_STATUS, 
+              'lang_combo' => Quotation::rate('cn_to_en'), 
+              'b2b' => true ]
+        );
+
+        $document = \League\FactoryMuffin\Facade::create('Document', ['project_id' => $project->id]);
+
+        $project = Project::find($project->id);
+        
+        $project->setWordCountTotal();
+        
+        $project->setOptimalQuote();
+
+        $coupon = \League\FactoryMuffin\Facade::create('Coupon', 
+            [ 'promotion_code' => 'www', 
+              'percent' => 0, 
+              'fixed' => 45] );
+
+        $coupon = \League\FactoryMuffin\Facade::create('Coupon', 
+            [ 'promotion_code' => '', 
+              'percent' => 0, 
+              'fixed' => 55] );
+        
+        $this->service->process($project, 'www');
+        
+        $this->assertEquals($project->status, Project::WIP_STATUS);
+
+        $this->assertEquals($project->price, round($project->wordcount_total * Quotation::rate('cn_to_en')));
+
+        $this->assertEquals($project->discount, 45);
+
+        $this->assertEquals($project->final_price, round($project->wordcount_total * Quotation::rate('cn_to_en')) -45);        
+        
+    }
+
+}

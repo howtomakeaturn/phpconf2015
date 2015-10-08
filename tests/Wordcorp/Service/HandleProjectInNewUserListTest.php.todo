@@ -1,0 +1,113 @@
+<?php
+
+class HandleProjectInNewUserListTest extends TestCase {
+
+    protected $faker;
+
+    public function setUp()
+    {
+        parent::setUp();
+        
+        $this->faker = Faker\Factory::create('en_US');        
+                
+        DB::table('new_users')->truncate();        
+
+        \League\FactoryMuffin\Facade::loadFactories(dirname(dirname(__DIR__)) . '/factories');
+    }
+    
+    public function tearDown()
+    {
+        \League\FactoryMuffin\Facade::deleteSaved();
+    }    
+
+    public function testCheckExist()
+    {
+        $email = $this->faker->email();
+        
+        DB::table('new_users')->insert(
+            array('email' => $email)
+        );        
+        
+        $handle = new HandleProjectInNewUserList(new GoogleDriveServiceProvider());
+        
+        $this->assertTrue($handle->checkExist($email));
+        
+        $this->assertFalse($handle->checkExist($this->faker->email()));
+    }
+    
+    public function testHandleOptimalQuoteProject()
+    {
+        $project = \League\FactoryMuffin\Facade::create('Project', 
+            [ 'user_id' => 0,
+                'session_id' => Session::getId(),            
+                'status' => Project::OWNERLESS_STATUS, 
+              'lang_combo' => Quotation::rate('cn_to_en'), 
+              'b2b' => true ]
+        );
+
+        $document = \League\FactoryMuffin\Facade::create('Document', ['project_id' => $project->id]);
+
+        $user = \League\FactoryMuffin\Facade::create('User');
+
+        // Create a stub for the SomeClass class.
+        $stub = $this->getMockBuilder('GoogleDriveServiceProvider')
+                     ->getMock();
+
+        // Configure the stub.
+        $stub->method('updateFolderName')
+             ->willReturn('foo');
+                     
+        $service = new HandleProjectInNewUserList($stub);
+        
+        $service->handleProject($project, $user);
+        
+        $this->assertEquals($project->status, Project::WIP_STATUS);
+
+        $this->assertEquals($project->user_id, $user->id);
+    }
+
+    public function testHandleDesiredDueDateProject()
+    {
+        $project = \League\FactoryMuffin\Facade::create('Project', 
+            [ 'user_id' => 0,
+                'session_id' => Session::getId(),            
+                'status' => Project::OWNERLESS_STATUS, 
+              'lang_combo' => Quotation::rate('cn_to_en'), 
+              'desired_due_datetime' => date('Y-m-d'),
+              'b2b' => true ]
+        );
+
+        $document = \League\FactoryMuffin\Facade::create('Document', ['project_id' => $project->id]);
+
+        $user = \League\FactoryMuffin\Facade::create('User');
+                     
+        $service = new HandleProjectInNewUserList(new GoogleDriveServiceProvider());
+        
+        $service->handleProject($project, $user);
+        
+        $this->assertEquals($project->status, Project::AWAIT_QUOTE_STATUS);
+
+        $this->assertEquals($project->user_id, $user->id);
+    }
+    
+    public function testFindProject()
+    {
+        $project = \League\FactoryMuffin\Facade::create('Project', 
+            [ 'user_id' => 0,
+                'session_id' => Session::getId(),            
+                'status' => Project::OWNERLESS_STATUS, 
+              'lang_combo' => Quotation::rate('cn_to_en'), 
+              'desired_due_datetime' => date('Y-m-d'),
+              'b2b' => true ]
+        );
+        
+        $email = $this->faker->email();
+        
+        DB::table('new_users')->insert( [ 'email' => $email, 'session_id' => Session::getId() ] );
+        
+        $service = new HandleProjectInNewUserList(new \GoogleDriveServiceProvider());
+        
+        $this->assertEquals( $service->findProject($email)->id, $project->id );
+    }
+
+}

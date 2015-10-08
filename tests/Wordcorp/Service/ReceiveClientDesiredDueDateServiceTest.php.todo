@@ -1,0 +1,148 @@
+<?php
+
+class ReceiveClientDesiredDueDateServiceTest extends TestCase 
+{
+    
+    protected $service;
+    
+    protected $faker;
+
+    public function setUp()
+    {
+        parent::setUp();
+
+        \League\FactoryMuffin\Facade::loadFactories(dirname(dirname(__DIR__)) . '/factories');
+
+        $this->faker = Faker\Factory::create('en_US');
+
+        $this->service = new ReceiveClientDesiredDueDateService(
+//            new PremiumCouponApplyService(),
+  //          new PremiumCouponRepository()            
+        );
+        
+        Coupon::truncate();
+    }
+    
+    public function tearDown()
+    {
+        \League\FactoryMuffin\Facade::deleteSaved();
+    }    
+
+    // No code coupon. No codeless coupon. 
+    public function testProcessWithScenarioA()
+    {
+        $project = \League\FactoryMuffin\Facade::create('Project', 
+            [ 'status' => Project::CREATED_STATUS, 
+              'lang_combo' => Quotation::rate('cn_to_en'), 
+              'b2b' => true ]
+        );
+
+        $document = \League\FactoryMuffin\Facade::create('Document', ['project_id' => $project->id]);
+
+        $desired = $this->faker->dateTimeThisDecade();
+        
+        $this->service->process($project, $desired, '');
+        
+        $this->assertEquals($project->status, Project::AWAIT_QUOTE_STATUS);
+
+        $this->assertEquals($project->desired_due_datetime, $desired);
+        
+        $this->assertNull($project->coupon);
+
+    }
+
+    // Has code coupon. No codeless coupon. 
+    public function testProcessWithScenarioB()
+    {
+        $project = \League\FactoryMuffin\Facade::create('Project', 
+            [ 'status' => Project::CREATED_STATUS, 
+              'lang_combo' => Quotation::rate('cn_to_en'), 
+              'b2b' => true ]
+        );
+
+        $document = \League\FactoryMuffin\Facade::create('Document', ['project_id' => $project->id]);
+
+        $project = Project::find($project->id);
+        
+        $project->setWordCountTotal();
+
+        $coupon = \League\FactoryMuffin\Facade::create('Coupon', 
+            [ 'promotion_code' => 'www', 
+              'percent' => 0, 
+              'fixed' => 25] );
+
+        $desired = $this->faker->dateTimeThisDecade();
+        
+        $this->service->process($project, $desired, 'www');
+        
+        $this->assertEquals($project->status, Project::AWAIT_QUOTE_STATUS);
+
+        $this->assertEquals($project->desired_due_datetime, $desired);
+        
+        $this->assertNotNull($project->coupon);
+    }
+
+    // No code coupon. Has codeless coupon. 
+    public function testProcessWithScenarioC()
+    {
+        $project = \League\FactoryMuffin\Facade::create('Project', 
+            [ 'status' => Project::CREATED_STATUS, 
+              'lang_combo' => Quotation::rate('cn_to_en'), 
+              'b2b' => true ]
+        );
+
+        $document = \League\FactoryMuffin\Facade::create('Document', ['project_id' => $project->id]);
+
+        $coupon = \League\FactoryMuffin\Facade::create('Coupon', 
+            [ 'promotion_code' => '', 
+              'percent' => 0, 
+              'fixed' => 35] );
+        
+        $desired = $this->faker->dateTimeThisDecade();
+        
+        $this->service->process($project, $desired, '');
+        
+        $this->assertEquals($project->status, Project::AWAIT_QUOTE_STATUS);
+
+        $this->assertEquals($project->desired_due_datetime, $desired);
+        
+        $this->assertNotNull($project->coupon);
+    }
+
+    // Has code coupon. Has codeless coupon. 
+    public function testProcessWithScenarioD()
+    {
+        $project = \League\FactoryMuffin\Facade::create('Project', 
+            [ 'status' => Project::CREATED_STATUS, 
+              'lang_combo' => Quotation::rate('cn_to_en'), 
+              'b2b' => true ]
+        );
+
+        $document = \League\FactoryMuffin\Facade::create('Document', ['project_id' => $project->id]);
+
+        $project = Project::find($project->id);
+        
+        $project->setWordCountTotal();
+
+        $coupon = \League\FactoryMuffin\Facade::create('Coupon', 
+            [ 'promotion_code' => 'www', 
+              'percent' => 0, 
+              'fixed' => 45] );
+
+        $coupon = \League\FactoryMuffin\Facade::create('Coupon', 
+            [ 'promotion_code' => '', 
+              'percent' => 0, 
+              'fixed' => 55] );
+        
+        $desired = $this->faker->dateTimeThisDecade();
+        
+        $this->service->process($project, $desired, 'www');
+        
+        $this->assertEquals($project->status, Project::AWAIT_QUOTE_STATUS);
+
+        $this->assertEquals($project->desired_due_datetime, $desired);
+        
+        $this->assertNotNull($project->coupon);        
+    }
+    
+}

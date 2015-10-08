@@ -1,0 +1,22 @@
+<?php
+
+class UserMiscTest extends TestCase {
+    // developing
+    public function testGetTranslators()
+    {
+        $translatorRole = Role::where('title', 'translator')->first();
+        $translators = $translatorRole->users;
+        
+        $num = 0;
+        $users = User::all();
+        foreach($users as $user){
+            if ($user->checkRole('translator')){
+                $num += 1;
+            }
+        }
+        
+        $this->assertEquals($translators->count(), $num);
+        
+    }
+    
+}

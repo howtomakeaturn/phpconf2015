@@ -1,0 +1,16 @@
+<?php
+
+class NewUserRequestServiceTest extends TestCase {
+
+    public function testAdd()
+    {
+        $service = new NewUserRequestService();
+        
+        $faker = Faker\Factory::create('en_US');              
+        
+        $id = $service->add($faker->email(), md5(rand()));
+        
+        $this->assertNotNull($id);        
+    }
+    
+}

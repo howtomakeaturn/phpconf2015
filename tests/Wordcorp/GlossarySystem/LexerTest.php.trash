@@ -1,0 +1,35 @@
+<?php namespace Tests\Wordcorp\GlossarySystem;
+
+use Wordcorp\GlossarySystem\Lexer;
+use Wordcorp\GlossarySystem\Compiler;
+
+class LexerTest extends \TestCase 
+{
+    
+    public function setUp()
+    {
+        parent::setUp();
+        
+    }
+    
+    public function test_case()
+    {
+        $text = '[[[214f39d309ccb5605044a578181f6bac:中華民國]]]是位於東亞的[[[ec1b54a33373266ce0678b3ccf2a746f:共和立憲制]]]國家，也是亞洲現存歷史最久的民主[[[5ff2ba78fb466fe89acf99ec23b28fc0:共和國]]][16]。';
+
+#        $text = '享有高度[[[cb541e2b493de892860ab736cdc0a1cf:新聞自由]]]、醫療保健[21][[BAD BOY HERE]]、[[[be4b47421edd90e38b62decd1a8751f2:公共教育]]]、[[[f0c7fdb3c380c8a668eed1189548b8dc:經濟自由]]]和人文發展[10][22]。';
+
+#        $text = 'it is with[[[cb541e2b493de892860ab736cdc0a1cf:speech freedom]]], health care[21], [[[be4b47421edd90e38b62decd1a8751f2:public education]]].';
+
+        $input = array($text);
+
+        $tokens = Lexer::run($input);
+
+        $plain = Compiler::compileToPlainText($tokens);
+
+        $this->assertEquals(
+            '中華民國是位於東亞的共和立憲制國家，也是亞洲現存歷史最久的民主共和國[16]。',
+            $plain
+        );
+    }
+
+}

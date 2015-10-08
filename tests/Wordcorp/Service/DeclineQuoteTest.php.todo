@@ -1,0 +1,70 @@
+<?php
+
+use Wordcorp\Quotes\QuoteFactory;
+use Wordcorp\Quotes\QuoteRepository;
+use Wordcorp\Quotes\DeclineService;
+use Wordcorp\Quotes\Quote;
+
+class DeclineQuoteTest extends TestCase {
+
+    // Find a randomDate between $start_date and $end_date
+    public function randomDate($start_date, $end_date)
+    {
+        // Convert to timetamps
+        $min = strtotime($start_date);
+        $max = strtotime($end_date);
+
+        // Generate random number using above bounds
+        $val = rand($min, $max);
+
+        // Convert back to desired date format
+        return new Datetime;
+    }
+
+    public function createQuote()
+    {
+        $factory = new QuoteFactory();        
+
+        $project = new Project();
+        
+        $project->number = md5(rand());
+
+        $project->save();
+
+        $due = $this->randomDate('2015-01-01 00:00', '2015-12-30 23:59');
+
+        $rate = mt_rand(0, 1000) / 1000 * 4 + 1;// range: 1.0 ~ 5.0
+
+        $quote = $factory->create($due, $rate, $project);
+
+        $repository = new QuoteRepository();
+
+        $repository->save($quote);
+
+        return $quote;        
+    }
+
+    public function testDecline()
+    {
+        $quote = $this->createQuote();
+        
+        $service = new DeclineService();
+        
+        $project = $quote->project;
+        
+        $service->decline($project);
+
+        $project->save();
+            
+        (new QuoteRepository())->saveMany($project->quotes);
+        
+        $project = Project::find($quote->project->id);
+
+        $quote = (new QuoteRepository())->getById($quote->id);
+                                
+        $this->assertEquals($project->status, Project::REJECT_OFFER_STATUS);
+
+        $this->assertEquals($quote->status, Quote::DECLINED);
+    }
+
+}
